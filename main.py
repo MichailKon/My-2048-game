@@ -1,7 +1,7 @@
 import tkinter
 import random
 from copy import deepcopy
-from math import log2
+
 
 ARROWS = ['Up', 'Down', 'Right', 'Left']
 COLORS = {
@@ -32,7 +32,7 @@ class Game2048:
         self.MIN_X = self.MIN_Y = 0
 
         self.score = 0
-        self.cells = [[0 for i in range(self.N_Y)] for j in range(self.N_X)]
+        self.cells = [[None for i in range(self.N_Y)] for j in range(self.N_X)]
         self.master = tkinter.Tk()
         self.master.columnconfigure(0, pad=3)
         self.master.columnconfigure(1, pad=3)
@@ -87,7 +87,7 @@ class Game2048:
     def change_field_size(self, new_size):
         self.N_X = self.N_Y = new_size
         self.STEP = self.MAX_X // self.N_X
-        self.cells = [[0 for i in range(self.N_Y)] for j in range(self.N_X)]
+        self.cells = [[None for i in range(self.N_Y)] for j in range(self.N_X)]
         self.score = 0
         self.make_frame()
 
@@ -102,7 +102,7 @@ class Game2048:
         free_cells = []
         for i in range(self.N_X):
             for j in range(self.N_Y):
-                if self.cells[i][j] == 0:
+                if self.cells[i][j] is None:
                     free_cells.append((i, j))
         if not free_cells:
             return
@@ -112,12 +112,12 @@ class Game2048:
 
     def make_frame(self):
         self.make_lines_and_field()
-        if all(map(lambda x: x == [0] * self.N_Y, self.cells)):
+        if all(map(lambda x: x == [None] * self.N_Y, self.cells)):
             self.put_random_number()
         self.score_label.config(text=f'Score: {self.score}')
         for row in range(self.N_X):
             for col in range(self.N_Y):
-                if self.cells[row][col] != 0:
+                if self.cells[row][col] is not None:
                     number = str(self.cells[row][col])
                     x_cord = (self.STEP * col + self.STEP * (col + 1)) // 2
                     y_cord = (self.STEP * row + self.STEP * (row + 1)) // 2
@@ -129,13 +129,13 @@ class Game2048:
     def restart(self):
         self.game_over_button.grid_forget()
         self.score = 0
-        self.cells = [[0 for i in range(self.N_Y)] for j in range(self.N_X)]
+        self.cells = [[None for i in range(self.N_Y)] for j in range(self.N_X)]
         self.make_frame()
 
     def is_game_over(self):
         was_cells = deepcopy(self.cells)
         was_score = deepcopy(self.score)
-        can_merge = any(map(lambda x: 0 in x, was_cells))
+        can_merge = any(map(lambda x: None in x, was_cells))
         can_merge |= self.make_up()
         can_merge |= self.make_right()
         can_merge |= self.make_down()
@@ -163,96 +163,92 @@ class Game2048:
         was_merge = False
         for row in range(self.N_X - 1):
             for col in range(self.N_Y):
-                if self.cells[row + 1][col] == self.cells[row][col] != 0:
+                if self.cells[row + 1][col] == self.cells[row][col] and self.cells[row][col] is not None:
                     self.cells[row][col] *= 2
-                    self.cells[row + 1][col] = 0
+                    self.cells[row + 1][col] = None
                     self.score += self.cells[row][col]
                     was_merge = True
-                elif self.cells[row][col] == 0 and self.cells[row + 1][col] != 0:
-                    # self.cells[row][col] = self.cells[row + 1][col]
-                    # self.cells[row + 1][col] = 0
+                elif self.cells[row][col] is None and self.cells[row + 1][col] is not None:
                     row1 = row
-                    while row1 > -1 and self.cells[row1][col] == 0:
+                    while row1 > -1 and self.cells[row1][col] is None:
                         self.cells[row1][col] = self.cells[row1 + 1][col]
-                        self.cells[row1 + 1][col] = 0
+                        self.cells[row1 + 1][col] = None
                         row1 -= 1
-                    if row != -1 and self.cells[row1 + 1][col] == self.cells[row1][col] != 0:
+                    if row != -1 and self.cells[row1 + 1][col] == self.cells[row1][col] and \
+                       self.cells[row1][col] is not None:
                         self.cells[row1][col] *= 2
                         was_merge = True
                         self.score += self.cells[row1][col]
-                        self.cells[row1 + 1][col] = 0
+                        self.cells[row1 + 1][col] = None
         return was_merge
 
     def make_down(self):
         was_merge = False
         for row in range(self.N_X - 1, 0, -1):
             for col in range(self.N_Y):
-                if self.cells[row - 1][col] == self.cells[row][col] != 0:
+                if self.cells[row - 1][col] == self.cells[row][col] and self.cells[row][col] is not None:
                     self.cells[row][col] *= 2
                     was_merge = True
                     self.score += self.cells[row][col]
-                    self.cells[row - 1][col] = 0
-                elif self.cells[row][col] == 0 and self.cells[row - 1][col] != 0:
-                    # self.cells[row][col] = self.cells[row - 1][col]
-                    # self.cells[row - 1][col] = 0
+                    self.cells[row - 1][col] = None
+                elif self.cells[row][col] is None and self.cells[row - 1][col] is not None:
                     row1 = row
-                    while row1 < self.N_X and self.cells[row1][col] == 0:
+                    while row1 < self.N_X and self.cells[row1][col] is None:
                         self.cells[row1][col] = self.cells[row1 - 1][col]
-                        self.cells[row1 - 1][col] = 0
+                        self.cells[row1 - 1][col] = None
                         row1 += 1
-                    if row1 != self.N_X and self.cells[row1 - 1][col] == self.cells[row1][col] != 0:
+                    if row1 != self.N_X and self.cells[row1 - 1][col] == self.cells[row1][col] and \
+                       self.cells[row1][col] is not None:
                         self.cells[row1][col] *= 2
                         was_merge = True
                         self.score += self.cells[row1][col]
-                        self.cells[row1 - 1][col] = 0
+                        self.cells[row1 - 1][col] = None
         return was_merge
 
     def make_right(self):
         was_merge = False
         for row in range(self.N_X):
             for col in range(self.N_Y - 1, 0, -1):
-                if self.cells[row][col] == self.cells[row][col - 1] != 0:
+                if self.cells[row][col] == self.cells[row][col - 1] and self.cells[row][col] is not None:
                     self.cells[row][col] *= 2
                     was_merge = True
                     self.score += self.cells[row][col]
-                    self.cells[row][col - 1] = 0
-                elif self.cells[row][col] == 0 and self.cells[row][col - 1] != 0:
-                    # self.cells[row][col] = self.cells[row][col - 1]
-                    # self.cells[row][col - 1] = 0
+                    self.cells[row][col - 1] = None
+                elif self.cells[row][col] is None and self.cells[row][col - 1] is not None:
                     col1 = col
-                    while col1 < self.N_Y and self.cells[row][col1] == 0:
+                    while col1 < self.N_Y and self.cells[row][col1] is None:
                         self.cells[row][col1] = self.cells[row][col1 - 1]
-                        self.cells[row][col1 - 1] = 0
+                        self.cells[row][col1 - 1] = None
                         col1 += 1
-                    if col1 != self.N_Y and self.cells[row][col1] == self.cells[row][col1 - 1] != 0:
+                    if col1 != self.N_Y and self.cells[row][col1] == self.cells[row][col1 - 1] and \
+                       self.cells[row][col1] is not None:
                         self.cells[row][col1] *= 2
                         was_merge = True
                         self.score += self.cells[row][col1]
-                        self.cells[row][col1 - 1] = 0
+                        self.cells[row][col1 - 1] = None
         return was_merge
 
     def make_left(self):
         was_merge = False
         for row in range(self.N_X):
             for col in range(self.N_Y - 1):
-                if self.cells[row][col] == self.cells[row][col + 1] != 0:
+                if self.cells[row][col] == self.cells[row][col + 1] and self.cells[row][col] is not None:
                     self.cells[row][col] *= 2
                     was_merge = True
                     self.score += self.cells[row][col]
-                    self.cells[row][col + 1] = 0
-                elif self.cells[row][col] == 0 and self.cells[row][col + 1] != 0:
-                    # self.cells[row][col] = self.cells[row][col + 1]
-                    # self.cells[row][col + 1] = 0
+                    self.cells[row][col + 1] = None
+                elif self.cells[row][col] is None and self.cells[row][col + 1] is not None:
                     col1 = col
-                    while col1 > -1 and self.cells[row][col1] == 0:
+                    while col1 > -1 and self.cells[row][col1] is None:
                         self.cells[row][col1] = self.cells[row][col1 + 1]
-                        self.cells[row][col1 + 1] = 0
+                        self.cells[row][col1 + 1] = None
                         col1 -= 1
-                    if col1 != -1 and self.cells[row][col1] == self.cells[row][col1 + 1] != 0:
+                    if col1 != -1 and self.cells[row][col1] == self.cells[row][col1 + 1] and \
+                       self.cells[row][col1] is not None:
                         self.cells[row][col1] *= 2
                         was_merge = True
                         self.score += self.cells[row][col1]
-                        self.cells[row][col1 + 1] = 0
+                        self.cells[row][col1 + 1] = None
         return was_merge
 
     def run(self):
