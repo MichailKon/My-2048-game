@@ -1,7 +1,7 @@
 import tkinter
 import random
 from copy import deepcopy
-
+import math
 
 ARROWS = ['Up', 'Down', 'Right', 'Left']
 COLORS = {
@@ -26,6 +26,7 @@ COLORS = {
 class Game2048:
     def __init__(self):
         self.STEP = 120
+        self.STEP_TO_MOVE = 1
         self.N_X = self.N_Y = 5
         self.MAX_X = self.STEP * self.N_X
         self.MAX_Y = self.STEP * self.N_Y
@@ -33,7 +34,6 @@ class Game2048:
 
         self.score = 0
         self.cells = [[None for i in range(self.N_Y)] for j in range(self.N_X)]
-        self.names = [f'rectangle_{i}' for i in range(self.N_X * self.N_Y)]
 
         self.master = tkinter.Tk()
         self.master.columnconfigure(0, pad=3)
@@ -103,29 +103,43 @@ class Game2048:
             return
         row, col = random.choice(free_cells)
         number = random.choice([2, 2, 2, 4])
-        self.cells[row][col] = number
+        x_cord = (self.STEP * col + self.STEP * (col + 1)) // 2
+        y_cord = (self.STEP * row + self.STEP * (row + 1)) // 2
+
+        number = str(number)
+        rect = self.canvas.create_rectangle(self.STEP * col, self.STEP * row,
+                                            self.STEP * (col + 1), self.STEP * (row + 1),
+                                            fill=COLORS[number] if number in COLORS.keys() else COLORS['beyond'])
+        label = self.canvas.create_text(x_cord, y_cord, font='Courier 27', text=number)
+        self.cells[row][col] = [int(number), rect, label]
 
     def make_frame(self):
-        self.make_lines_and_field()
         if all(map(lambda x: x == [None] * self.N_Y, self.cells)):
             self.put_random_number()
         self.score_label.config(text=f'Score: {self.score}')
-        for row in range(self.N_X):
-            for col in range(self.N_Y):
-                if self.cells[row][col] is not None:
-                    number = str(self.cells[row][col])
-                    x_cord = (self.STEP * col + self.STEP * (col + 1)) // 2
-                    y_cord = (self.STEP * row + self.STEP * (row + 1)) // 2
-                    self.canvas.create_rectangle(self.STEP * col, self.STEP * row,
-                                                 self.STEP * (col + 1), self.STEP * (row + 1),
-                                                 fill=COLORS[number] if number in COLORS.keys() else COLORS['beyond'])
-                    self.canvas.create_text(x_cord, y_cord, font='Courier 27', text=number)
+
+    def make_anim_without_merge(self, row1, col1, row2, col2):
+        """ move cell from {row1, col1} to {row2, col2} """
+        sign1 = math.copysign(col2 != col1, col2 - col1)
+        sign2 = math.copysign(row2 != row1, row2 - row1)
+        for j in range(0, self.STEP, self.STEP_TO_MOVE):
+            self.canvas.move(self.cells[row1][col1][1], self.STEP_TO_MOVE * sign1, 0)
+            self.canvas.move(self.cells[row1][col1][1], 0, self.STEP_TO_MOVE * sign2)
+            self.canvas.move(self.cells[row1][col1][2], self.STEP_TO_MOVE * sign1, 0)
+            self.canvas.move(self.cells[row1][col1][2], 0, self.STEP_TO_MOVE * sign2)
+
+    def merge_anim(self, row1, col1, row2, col2):
+        """ merge cells {row1, col1} and {row2, col2} """
+        self.canvas.delete(self.cells[row2][col2][1], self.cells[row2][col2][2])
+        num = str(self.cells[row1][col1][0])
+        self.canvas.itemconfig(self.cells[row1][col1][2], text=f'{num}')
+        self.canvas.itemconfig(self.cells[row1][col1][1], fill=COLORS[str(num)])
 
     def restart(self):
         self.game_over_button.grid_forget()
         self.score = 0
-        self.names = [f'rectangle_{i}' for i in range(self.N_X * self.N_Y)]
         self.cells = [[None for i in range(self.N_Y)] for j in range(self.N_X)]
+        self.make_lines_and_field()
         self.make_frame()
 
     def is_game_over(self):
@@ -153,16 +167,18 @@ class Game2048:
         if event.keysym in ARROWS:
             self.put_random_number()
             self.make_frame()
-        self.is_game_over()
+            # self.is_game_over()
 
     def try_and_merge(self, row1, col1, row2, col2):
         if not (0 <= row1 < self.N_X) or not (0 <= row2 <= self.N_X) or \
            not (0 <= col1 < self.N_Y) or not (0 <= col2 < self.N_Y):
             return False
-        if self.cells[row1][col1] == self.cells[row2][col2] and self.cells[row1][col1] is not None:
-            self.cells[row1][col1] *= 2
+        if self.cells[row1][col1] is not None and self.cells[row2][col2] is not None \
+           and self.cells[row1][col1][0] == self.cells[row2][col2][0]:
+            self.cells[row1][col1][0] *= 2
+            self.merge_anim(row1, col1, row2, col2)
             self.cells[row2][col2] = None
-            self.score += self.cells[row1][col1]
+            self.score += self.cells[row1][col1][0]
             return True
         return False
 
@@ -175,6 +191,7 @@ class Game2048:
                 elif self.cells[row][col] is None and self.cells[row + 1][col] is not None:
                     row1 = row
                     while row1 > -1 and self.cells[row1][col] is None:
+                        self.make_anim_without_merge(row1 + 1, col, row1, col)
                         self.cells[row1][col] = self.cells[row1 + 1][col]
                         self.cells[row1 + 1][col] = None
                         row1 -= 1
@@ -191,6 +208,7 @@ class Game2048:
                 elif self.cells[row][col] is None and self.cells[row - 1][col] is not None:
                     row1 = row
                     while row1 < self.N_X and self.cells[row1][col] is None:
+                        self.make_anim_without_merge(row1 - 1, col, row1, col)
                         self.cells[row1][col] = self.cells[row1 - 1][col]
                         self.cells[row1 - 1][col] = None
                         row1 += 1
@@ -207,6 +225,7 @@ class Game2048:
                 elif self.cells[row][col] is None and self.cells[row][col - 1] is not None:
                     col1 = col
                     while col1 < self.N_Y and self.cells[row][col1] is None:
+                        self.make_anim_without_merge(row, col1 - 1, row, col1)
                         self.cells[row][col1] = self.cells[row][col1 - 1]
                         self.cells[row][col1 - 1] = None
                         col1 += 1
@@ -223,6 +242,7 @@ class Game2048:
                 elif self.cells[row][col] is None and self.cells[row][col + 1] is not None:
                     col1 = col
                     while col1 > -1 and self.cells[row][col1] is None:
+                        self.make_anim_without_merge(row, col1 + 1, row, col1)
                         self.cells[row][col1] = self.cells[row][col1 + 1]
                         self.cells[row][col1 + 1] = None
                         col1 -= 1
@@ -231,6 +251,7 @@ class Game2048:
         return was_merge
 
     def run(self):
+        self.restart()
         self.make_frame()
         self.master.mainloop()
 
