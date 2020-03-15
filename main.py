@@ -33,13 +33,14 @@ class Game2048:
 
         self.score = 0
         self.cells = [[None for i in range(self.N_Y)] for j in range(self.N_X)]
+        self.names = [f'rectangle_{i}' for i in range(self.N_X * self.N_Y)]
+
         self.master = tkinter.Tk()
         self.master.columnconfigure(0, pad=3)
         self.master.columnconfigure(1, pad=3)
         self.master.columnconfigure(2, pad=3)
         self.master.columnconfigure(3, pad=3)
         self.master.columnconfigure(4, pad=3)
-
         self.master.rowconfigure(0, pad=3)
         self.master.rowconfigure(1, pad=3)
         self.master.rowconfigure(2, pad=3)
@@ -55,28 +56,23 @@ class Game2048:
         self.score_label.grid(row=1, column=2)
         self.canvas = tkinter.Canvas(self.master, bg='white', height=self.N_X * self.STEP, width=self.N_X * self.STEP)
         self.canvas.grid(row=2, column=0, columnspan=self.N_X, rowspan=self.N_Y)
-
         self.button_to_3_by_3 = tkinter.Button(self.master, text='3 by 3', font='Courier 14',
                                                command=self.change_to_3_by_3)
         self.button_to_3_by_3.grid(row=7, column=0)
         self.button_to_4_by_4 = tkinter.Button(self.master, text='4 by 4', font='Courier 14',
                                                command=self.change_to_4_by_4)
         self.button_to_4_by_4.grid(row=7, column=1)
-
         self.restart_button = tkinter.Button(self.master, text='restart', font='Courier 14',
                                              command=self.restart)
         self.restart_button.grid(row=7, column=2)
-
         self.button_to_5_by_5 = tkinter.Button(self.master, text='5 by 5', font='Courier 14',
                                                command=self.change_to_5_by_5)
         self.button_to_5_by_5.grid(row=7, column=3)
         self.button_to_6_by_6 = tkinter.Button(self.master, text='6 by 6', font='Courier 14',
                                                command=self.change_to_6_by_6)
         self.button_to_6_by_6.grid(row=7, column=4)
-
         self.game_over_button = tkinter.Button(self.master, text='Game Over\nRestart?', font='Courier 20',
                                                command=self.restart)
-
         self.master.bind("<KeyPress>", self.key_pressed)
 
     def change_to_3_by_3(self): self.change_field_size(3)
@@ -87,8 +83,7 @@ class Game2048:
     def change_field_size(self, new_size):
         self.N_X = self.N_Y = new_size
         self.STEP = self.MAX_X // self.N_X
-        self.cells = [[None for i in range(self.N_Y)] for j in range(self.N_X)]
-        self.score = 0
+        self.restart()
         self.make_frame()
 
     def make_lines_and_field(self):
@@ -129,6 +124,7 @@ class Game2048:
     def restart(self):
         self.game_over_button.grid_forget()
         self.score = 0
+        self.names = [f'rectangle_{i}' for i in range(self.N_X * self.N_Y)]
         self.cells = [[None for i in range(self.N_Y)] for j in range(self.N_X)]
         self.make_frame()
 
@@ -159,14 +155,22 @@ class Game2048:
             self.make_frame()
         self.is_game_over()
 
+    def try_and_merge(self, row1, col1, row2, col2):
+        if not (0 <= row1 < self.N_X) or not (0 <= row2 <= self.N_X) or \
+           not (0 <= col1 < self.N_Y) or not (0 <= col2 < self.N_Y):
+            return False
+        if self.cells[row1][col1] == self.cells[row2][col2] and self.cells[row1][col1] is not None:
+            self.cells[row1][col1] *= 2
+            self.cells[row2][col2] = None
+            self.score += self.cells[row1][col1]
+            return True
+        return False
+
     def make_up(self):
         was_merge = False
         for row in range(self.N_X - 1):
             for col in range(self.N_Y):
-                if self.cells[row + 1][col] == self.cells[row][col] and self.cells[row][col] is not None:
-                    self.cells[row][col] *= 2
-                    self.cells[row + 1][col] = None
-                    self.score += self.cells[row][col]
+                if self.try_and_merge(row, col, row + 1, col):
                     was_merge = True
                 elif self.cells[row][col] is None and self.cells[row + 1][col] is not None:
                     row1 = row
@@ -174,81 +178,56 @@ class Game2048:
                         self.cells[row1][col] = self.cells[row1 + 1][col]
                         self.cells[row1 + 1][col] = None
                         row1 -= 1
-                    if row != -1 and self.cells[row1 + 1][col] == self.cells[row1][col] and \
-                       self.cells[row1][col] is not None:
-                        self.cells[row1][col] *= 2
+                    if self.try_and_merge(row1, col, row1 + 1, col):
                         was_merge = True
-                        self.score += self.cells[row1][col]
-                        self.cells[row1 + 1][col] = None
         return was_merge
 
     def make_down(self):
         was_merge = False
         for row in range(self.N_X - 1, 0, -1):
             for col in range(self.N_Y):
-                if self.cells[row - 1][col] == self.cells[row][col] and self.cells[row][col] is not None:
-                    self.cells[row][col] *= 2
+                if self.try_and_merge(row, col, row - 1, col):
                     was_merge = True
-                    self.score += self.cells[row][col]
-                    self.cells[row - 1][col] = None
                 elif self.cells[row][col] is None and self.cells[row - 1][col] is not None:
                     row1 = row
                     while row1 < self.N_X and self.cells[row1][col] is None:
                         self.cells[row1][col] = self.cells[row1 - 1][col]
                         self.cells[row1 - 1][col] = None
                         row1 += 1
-                    if row1 != self.N_X and self.cells[row1 - 1][col] == self.cells[row1][col] and \
-                       self.cells[row1][col] is not None:
-                        self.cells[row1][col] *= 2
+                    if self.try_and_merge(row1, col, row1 - 1, col):
                         was_merge = True
-                        self.score += self.cells[row1][col]
-                        self.cells[row1 - 1][col] = None
         return was_merge
 
     def make_right(self):
         was_merge = False
         for row in range(self.N_X):
             for col in range(self.N_Y - 1, 0, -1):
-                if self.cells[row][col] == self.cells[row][col - 1] and self.cells[row][col] is not None:
-                    self.cells[row][col] *= 2
+                if self.try_and_merge(row, col, row, col - 1):
                     was_merge = True
-                    self.score += self.cells[row][col]
-                    self.cells[row][col - 1] = None
                 elif self.cells[row][col] is None and self.cells[row][col - 1] is not None:
                     col1 = col
                     while col1 < self.N_Y and self.cells[row][col1] is None:
                         self.cells[row][col1] = self.cells[row][col1 - 1]
                         self.cells[row][col1 - 1] = None
                         col1 += 1
-                    if col1 != self.N_Y and self.cells[row][col1] == self.cells[row][col1 - 1] and \
-                       self.cells[row][col1] is not None:
-                        self.cells[row][col1] *= 2
+                    if self.try_and_merge(row, col1, row, col1 - 1):
                         was_merge = True
-                        self.score += self.cells[row][col1]
-                        self.cells[row][col1 - 1] = None
         return was_merge
 
     def make_left(self):
         was_merge = False
         for row in range(self.N_X):
             for col in range(self.N_Y - 1):
-                if self.cells[row][col] == self.cells[row][col + 1] and self.cells[row][col] is not None:
-                    self.cells[row][col] *= 2
+                if self.try_and_merge(row, col, row, col + 1):
                     was_merge = True
-                    self.score += self.cells[row][col]
-                    self.cells[row][col + 1] = None
                 elif self.cells[row][col] is None and self.cells[row][col + 1] is not None:
                     col1 = col
                     while col1 > -1 and self.cells[row][col1] is None:
                         self.cells[row][col1] = self.cells[row][col1 + 1]
                         self.cells[row][col1 + 1] = None
                         col1 -= 1
-                    if col1 != -1 and self.cells[row][col1] == self.cells[row][col1 + 1] and \
-                       self.cells[row][col1] is not None:
-                        self.cells[row][col1] *= 2
+                    if self.try_and_merge(row, col1, row, col1 + 1):
                         was_merge = True
-                        self.score += self.cells[row][col1]
-                        self.cells[row][col1 + 1] = None
         return was_merge
 
     def run(self):
